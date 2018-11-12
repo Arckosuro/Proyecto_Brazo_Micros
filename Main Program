@@ -2,7 +2,7 @@
 ;UNIVSERSIDAD DEL VALLE DE GUATEMALA
 ;INTEGRANTES
 ;Bryan Sanders		    17294
-;Matias			    carnet
+;Matias			    carnet 16247
 ;
 ;FECHA: 10/11/2018
 ;Prgramacion para el control de cuatro distintos servos para el control de un 
@@ -11,6 +11,8 @@
 ;preciso del brazo al igual que comunicacion serial para comunicarse con una
 ;commputadora que estara reciviendo y mandando datos hacia el PIC16877 el cual
 ;mandara los datos necesarios para mover los distintos servos.
+
+
 
 #include "p16f887.inc"
 
