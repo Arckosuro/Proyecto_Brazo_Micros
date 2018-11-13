@@ -1,27 +1,23 @@
-
-    
-    
 #include "p16f887.inc"
-
-
  __CONFIG _CONFIG1, _FOSC_INTRC_NOCLKOUT & _WDTE_OFF & _PWRTE_OFF & _MCLRE_OFF & _CP_OFF & _CPD_OFF & _BOREN_OFF & _IESO_OFF & _FCMEN_OFF & _LVP_OFF
-
  __CONFIG _CONFIG2, _BOR4V_BOR40V & _WRT_OFF
-
-GPR_VAR        UDATA	    
-    TEMP	RES	1
-    STAT	RES	1
-    LECTURAADC1	RES	1
-    LECTURAADC2	RES	1
-    LECTURAADC3	RES	1
-    LECTURAADC4	RES	1
-    CUAL	RES	1
-    
-	
+   GPR_VAR        UDATA
+   TEMP         RES       1      ; w register for context saving (ACCESS)
+   STAT    RES       1      ; status used for context saving
+   DELAY1	  RES	    1
+   DELAY2	  RES	    1
+   VALORADRESH	  RES	    1
+   ANGULO  	  RES	    1
+   VALORADC	  RES	    1
+   VALORPC        RES	    1
+   LECTURAADC1	  RES	1
+   LECTURAADC2	RES	1
+   LECTURAADC3	RES	1
+   LECTURAADC4	RES	1
+   CUAL	RES	1
+	  
 RES_VECT  CODE    0x0000            ; processor reset vector
-    GOTO    SETUP                   ; go to beginning of program
-
- 
+    GOTO    START                   ; go to beginning of program
 
 ISR_VECT    CODE    0x0004
 
@@ -52,62 +48,44 @@ POP:
     RETFIE
     
     
-MAIN_PROG CODE
- 
-
-
-SETUP
-   BSF	    STATUS,RP0		
-   BCF	    STATUS,RP1
-   MOVLW    b'00000111'		
-   MOVWF    OSCCON
-   MOVLW    D'0' ;JUSTIFICADO A LA IZQUIERDA
-   MOVWF    ADCON1 ;ESTO JUSTIFICA PARA QUE LA CONVERSION LLENE A ADRESH
-   BSF	    TRISA,0 ;ACA ESTA LA ENTRADA DEL POTENCIOMETRO
-   BSF	    TRISA,1 ;ACA ESTA LA ENTRADA DEL POTENCIOMETRO
-   BSF	    TRISA,2 ;ACA ESTA LA ENTRADA DEL POTENCIOMETRO
-   BSF	    TRISA,3 ;ACA ESTA LA ENTRADA DEL POTENCIOMETRO
-   CLRF	    TRISB
-   CLRF	    PORTB
-   MOVLW    b'01000000' ;INTERRUPCION ASOCIADA A LA CONVERSION ADC
-   MOVWF    PIE1
-   MOVLW    b'10000000'	
-   MOVWF    OPTION_REG ;PRESCALER TIMER0 A 1 A 256
-   BSF	    STATUS,RP1	
-   BSF	    ANSEL,0   ;EL POTENCIOMETRO SE CONECTA AL BIT RA0
-   BSF	    ANSEL,1   ;EL POTENCIOMETRO SE CONECTA AL BIT RA0
-   BSF	    ANSEL,2   ;EL POTENCIOMETRO SE CONECTA AL BIT RA0
-   BSF	    ANSEL,3   ;EL POTENCIOMETRO SE CONECTA AL BIT RA0
-   BCF	    STATUS,RP0		
-   BCF	    STATUS,RP1
-   CALL	    CONFIGTIMER
-   MOVLW    b'00000000' ;SELECCION DEL PUERTO RA1 COMO ENTRADA CONTINUA EN EL TIEMPO
-   MOVWF    ADCON0
-   MOVLW    D'0'
-   MOVWF    ADRESH
-   MOVWF    ADRESL
-   MOVLW    b'11000000' ;PERMITE QUE EL ADC PUEDA INTERRUMPIR
-   MOVWF    INTCON
-   MOVLW    b'11000000' ;PERMITE QUE EL ADC PUEDA INTERRUMPIR
-   MOVWF    PIR1
-   CALL	    CONFIGURARPWM
-   CLRF	    STAT
-   CLRF	    TEMP
-   CLRF	    LECTURAADC1
-   CLRF	    LECTURAADC2
-   CLRF	    LECTURAADC3
-   CLRF	    LECTURAADC4
-   CLRF	    CUAL
-   BSF	    CUAL, 0
+MAIN_PROG CODE                      ; let linker place main program
+START
+    CALL    LIMPIARVARIABLES
+    CALL    CONFIG_RELOJ		; RELOJ INTERNO DE 500KHz
+    CALL    CONFIG_IO		
+    CALL    CONFIG_ADC			; canal 0, fosc/8, adc on, justificado a la izquierda, Vref interno (0-5V)
+    CALL    CONFIG_PWM
     
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;LOOP PRINCIPAL
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
 LOOP:
     BSF	    ADCON0,ADON ;PRENDE EL ADC
-    CALL    ESPERA ;ESPERA EL TIEMPO NECESARIO PARA QUE LA CONVERSION SE TERMINE
+    CALL    DELAYGENERAL ;ESPERA EL TIEMPO NECESARIO PARA QUE LA CONVERSION SE TERMINE
     BSF	    ADCON0,1 ;EMPIEZA LA CONVERSION
     CALL    ACTUALIZARVARIABLES
-    GOTO    LOOP  
+    GOTO LOOP
     
-CARGARVARIABLE1
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;FUNCIONES
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    CARGARVARIABLE1
     MOVF    ADRESH, W
     MOVWF   LECTURAADC1
     BSF	    ADCON0, 2  ;SET CHANNEL 1
@@ -156,51 +134,175 @@ ACTUALIZARVARIABLES
     ;MOVWF   PORTB
     RETURN
 
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    CONFIG_RELOJ
+    BANKSEL TRISA
+    BSF OSCCON, IRCF2
+    BCF OSCCON, IRCF1
+    BCF OSCCON, IRCF0		    ; FRECUECNIA DE 1MHz
+    BCF OSCCON, OSTS		    ; UTILIZAREMOS RELOJ INTERNO
+    BSF OSCCON, HTS		    ; ESTABLE
+    BSF OSCCON, SCS		    ; SELECCIONAMOS RELOJ INTERNO COMO EL RELOJ DEL SISTEMA
+    RETURN
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    
+CONFIG_IO
+    BANKSEL TRISA
+    CLRF    TRISA
+    CLRF    TRISB
+    CLRF    TRISC
+    CLRF    TRISD
+    BANKSEL ANSEL
+    CLRF    ANSEL
+    CLRF    ANSELH
+    BANKSEL PORTA
+    CLRF    PORTA
+    CLRF    PORTB
+    CLRF    PORTC
+    CLRF    PORTD
+    CLRF    PORTE
+    RETURN    
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    CONFIG_ADC
+    BANKSEL PORTA
+    BCF ADCON0, ADCS1
+    BCF ADCON0, ADCS0		; FOSC/8 RELOJ TAD
+    BCF ADCON0, CHS3		; CH0
+    BCF ADCON0, CHS2
+    BCF ADCON0, CHS1
+    BCF ADCON0, CHS0
+    MOVLW    D'0'
+    MOVWF    ADRESH
+    MOVWF    ADRESL
+    MOVLW    b'11000000' ;PERMITE QUE EL ADC PUEDA INTERRUMPIR
+    MOVWF    INTCON
+    MOVLW    b'11000000' ;PERMITE QUE EL ADC PUEDA INTERRUMPIR
+    MOVWF    PIR1
+    BANKSEL TRISA
+    BCF ADCON1, ADFM		; JUSTIFICACIÓN A LA IZQUIERDA
+    BCF ADCON1, VCFG1		; VSS COMO REFERENCIA VREF-
+    BCF ADCON1, VCFG0		; VDD COMO REFERENCIA VREF+
+    BANKSEL PORTA
+    BSF ADCON0, ADON		; ENCIENDO EL MÓDULO ADC
+    BANKSEL TRISA
+    BSF	    TRISA,0 ;POT1 EN RA0
+    BSF	    TRISA,1 ;POT2 EN RA1
+    BSF	    TRISA,2 ;POT3 EN RA2
+    BSF	    TRISA,3 ;POT4 EN RA3
+    MOVLW    b'01000000' ;INTERRUPCION ASOCIADA A LA CONVERSION ADC
+    MOVWF    PIE1
+    BANKSEL ANSEL
+    BSF	    ANSEL, 0		; ANS0 COMO ENTRADA ANALÓGICA
+    BSF	    ANSEL, 1		; ANS0 COMO ENTRADA ANALÓGICA
+    BSF	    ANSEL, 2		; ANS0 COMO ENTRADA ANALÓGICA
+    BSF	    ANSEL, 3		; ANS0 COMO ENTRADA ANALÓGICA
+    
+    RETURN
 
-ESPERA
-    ESPERARBANDERA:			
-	BTFSS   INTCON,T0IF	;ESPERA QUE EL TIMER0 TENGA UN OVERFLOW
-	GOTO    ESPERARBANDERA
-	CALL    CONFIGTIMER	;RECONFIGURA EL TIMER0
+DELAYGENERAL
+    MOVLW   .100		    ; 1US 
+    MOVWF   DELAY2
+    CALL    DELAY_500US
+    DECFSZ  DELAY2		    ;DECREMENTA CONT1
+    GOTO    $-2			    ; IR A LA POSICION DEL PC - 1
     RETURN
-   
-CONFIGTIMER		   
-    MOVLW   .20
-    MOVWF   TMR0
-    BCF	    INTCON,T0IF
+DELAY_500US
+    MOVLW   .250		    ; 1US 
+    MOVWF   DELAY1	    
+    DECFSZ  DELAY1		    ;DECREMENTA CONT1
+    GOTO    $-1			    ; IR A LA POSICION DEL PC - 1
     RETURN
-    
-CONFIGURARPWM
-    BSF	    STATUS,RP0
-    BCF	    STATUS,RP1
-    BSF	    TRISC,RC2	 
-    BSF	    TRISC,RC1	
-    MOVLW   D'255'	
-    MOVWF   PR2
-    BCF	    STATUS,RP0
-    BCF	    STATUS,RP1
-    MOVLW   B'00001100'
-    MOVWF   CCP1CON
-    MOVLW   B'10000000'
-    MOVWF   CCPR1L
-    MOVLW   B'00001100'
-    MOVWF   CCP2CON
-    MOVLW   B'10000000'
-    MOVWF   CCPR2L
-    
-TIMER2:
-    BCF	    PIR1,TMR2IF
-    BSF	    T2CON,T2CKPS0
-    BSF	    T2CON,T2CKPS1
-    BSF	    T2CON,TMR2ON
-CHECKTIMER2:
-    BTFSS   PIR1,TMR2IF
-    GOTO    CHECKTIMER2
-    BSF	    STATUS,RP0
-    BCF	    STATUS,RP1
-    BCF	    TRISC,RC2
-    BCF	    TRISC,RC1
+
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+CARGARADC
+    MOVF    VALORADC, W
+    MOVWF   CCPR1
     RETURN
-    
-    
+
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+LIMPIARVARIABLES
+   CLRF	    TEMP
+   CLRF	    STAT
+   CLRF	    DELAY1
+   CLRF	    DELAY2
+   CLRF	    VALORADRESH
+   CLRF	    ANGULO
+   CLRF	    VALORADC
+   CLRF	    VALORPC
+   CLRF	    LECTURAADC1
+   CLRF	    LECTURAADC2
+   CLRF	    LECTURAADC3
+   CLRF	    LECTURAADC4
+   CLRF	    CUAL
+   BSF	    CUAL, 0
+   RETURN
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+CONFIG_PWM
+    BANKSEL TRISC
+    BSF	    TRISC, RC2		    ; ESTABLEZCO RC1 / CCP2 COMO ENTRADA
+    MOVLW   .155
+    MOVWF   PR2			    ; COLOCO EL VALOR DEL PERIODO DE MI SEÑAL 20mS
+    BANKSEL PORTA
+    BSF	    CCP1CON, CCP1M3
+    BSF	    CCP1CON, CCP1M2
+    BCF	    CCP1CON, CCP1M1
+    BCF	    CCP1CON, CCP1M0		    ; MODO PWM
+    ;DUTY CYCLE
+    ;DUTY CYCLE
+    ;DUTY CYCLE
+    ;DUTY CYCLE
+    MOVLW   B'00001111'
+    MOVWF   CCPR1L		    ; MSB   DEL DUTY CICLE
+    BCF	    CCP1CON, DC1B0
+    BCF	    CCP1CON, DC1B1	    ; LSB del duty cicle
+    ;DUTY CYCLE
+    ;DUTY CYCLE
+    ;DUTY CYCLE
+    ;DUTY CYCLE
+    BCF	    PIR1, TMR2IF
+    BSF	    T2CON, T2CKPS1
+    BSF	    T2CON, T2CKPS0	    ; PRESCALER 1:16
+    BSF	    T2CON, TMR2ON	    ; HABILITAMOS EL TMR2
+    BTFSS   PIR1, TMR2IF
+    GOTO    $-1
+    BCF	    PIR1, TMR2IF
+    BANKSEL TRISC
+    BCF	    TRISC, RC2		    ; RC1 / CCP2 SALIDA PWM
+    BANKSEL PORTA
+    RETURN 
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
+    ;*******************************************
     END
